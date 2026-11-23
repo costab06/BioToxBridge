@@ -1,0 +1,167 @@
+{
+  "model_set_id": "tox21_continuous_v1",
+  "models": [
+    {
+      "name": "nr_ahr",
+      "sha256": "a00bb6e941a42a4fbf891d3e9ac5212cee7c7c8d66570435aeebf83e73a99849",
+      "bytes": 4492104,
+      "architecture": [
+        2048,
+        512,
+        128,
+        32,
+        1
+      ],
+      "trained": true,
+      "last_train_date": "2026-09-30T16:29:14Z"
+    },
+    {
+      "name": "nr_ar",
+      "sha256": "0146ea1392306c889f71600971beedfc0f7d0214de541f8d9d7b9566a567823b",
+      "bytes": 4492104,
+      "architecture": [
+        2048,
+        512,
+        128,
+        32,
+        1
+      ],
+      "trained": true,
+      "last_train_date": "2026-09-30T16:28:19Z"
+    },
+    {
+      "name": "nr_ar_lbd",
+      "sha256": "ee14aab948c1c1adb736598096e77e80db77dd459e4903d15e06c670db7e1c81",
+      "bytes": 4492104,
+      "architecture": [
+        2048,
+        512,
+        128,
+        32,
+        1
+      ],
+      "trained": true,
+      "last_train_date": "2026-09-30T16:28:20Z"
+    },
+    {
+      "name": "nr_aromatase",
+      "sha256": "ac537cad25fdb3c69a427d8064233df2f2ece8af4cc0c7d8e2d11833279de00e",
+      "bytes": 4492104,
+      "architecture": [
+        2048,
+        512,
+        128,
+        32,
+        1
+      ],
+      "trained": true,
+      "last_train_date": "2026-09-30T16:28:29Z"
+    },
+    {
+      "name": "nr_er",
+      "sha256": "da18f5692283fb4fa4a805c5d4f2d8da93f0ad4c25df908608ecc7dc4d2662f9",
+      "bytes": 278856,
+      "architecture": [
+        2048,
+        32,
+        1
+      ],
+      "trained": true,
+      "last_train_date": "2026-09-30T17:10:42Z"
+    },
+    {
+      "name": "nr_er_lbd",
+      "sha256": "0e8eee796787b1961f7a241ac0bc73c9569b9e30391102dffb56acad41f37bb2",
+      "bytes": 4492104,
+      "architecture": [
+        2048,
+        512,
+        128,
+        32,
+        1
+      ],
+      "trained": true,
+      "last_train_date": "2026-09-30T16:47:14Z"
+    },
+    {
+      "name": "nr_ppar_gamma",
+      "sha256": "5a32dd47e54f6a2aa390f22336211f86a5e53817ecd4eb94cd445f5ce3646a56",
+      "bytes": 4492104,
+      "architecture": [
+        2048,
+        512,
+        128,
+        32,
+        1
+      ],
+      "trained": true,
+      "last_train_date": "2026-09-30T16:28:36Z"
+    },
+    {
+      "name": "sr_are",
+      "sha256": "ccca8161989e31f3da85f46c10632f272a9a692ef238bbabc9313999f3f1813f",
+      "bytes": 278856,
+      "architecture": [
+        2048,
+        32,
+        1
+      ],
+      "trained": true,
+      "last_train_date": "2026-09-30T17:19:06Z"
+    },
+    {
+      "name": "sr_atad5",
+      "sha256": "5d8c7b4a6fd72102fedd1fbb9205f1fe3624b226c44eee5e237ce829d124e23a",
+      "bytes": 4492104,
+      "architecture": [
+        2048,
+        512,
+        128,
+        32,
+        1
+      ],
+      "trained": true,
+      "last_train_date": "2026-09-30T16:30:02Z"
+    },
+    {
+      "name": "sr_hse",
+      "sha256": "6a9d2e3b83eddc25e537a7182c33d2f58546fe561eb0190a26c89eea9ce3f95a",
+      "bytes": 278856,
+      "architecture": [
+        2048,
+        32,
+        1
+      ],
+      "trained": true,
+      "last_train_date": "2026-09-30T16:48:29Z"
+    },
+    {
+      "name": "sr_mmp",
+      "sha256": "d321ccb2d0a79d24369c595750b918fa3048b29addc531242384850c4256740f",
+      "bytes": 4492104,
+      "architecture": [
+        2048,
+        512,
+        128,
+        32,
+        1
+      ],
+      "trained": true,
+      "last_train_date": "2026-09-30T16:30:29Z"
+    },
+    {
+      "name": "sr_p53",
+      "sha256": "4212892b96cc08bdf6a297b5c5b115e565231b2eee8d7ac0c8640dc6dd4caf9b",
+      "bytes": 4492104,
+      "architecture": [
+        2048,
+        512,
+        128,
+        32,
+        1
+      ],
+      "trained": true,
+      "last_train_date": "2026-09-30T16:30:56Z"
+    }
+  ]
+}

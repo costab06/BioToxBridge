@@ -1,0 +1,172 @@
+"""Source registration, SHA-256 checksums, and run manifests."""
+
+import hashlib
+import json
+import os
+import platform
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+def sha256(path: str | Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def register_source(path: str | Path, source: str, release: str,
+                    retrieval_date: str, description: str = "") -> dict:
+    """Return a provenance record for an immutable source file."""
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"Source file not found: {p}")
+    return {
+        "file":           str(p),
+        "sha256":         sha256(p),
+        "size_bytes":     p.stat().st_size,
+        "source":         source,
+        "release":        release,
+        "retrieval_date": retrieval_date,
+        "description":    description,
+        "registered_at":  datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def load_source_manifest(path: str | Path) -> dict:
+    """Load an existing source manifest; return empty dict if not found."""
+    p = Path(path)
+    if p.exists():
+        return json.loads(p.read_text())
+    return {}
+
+
+def save_source_manifest(manifest: dict, path: str | Path) -> None:
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_text(json.dumps(manifest, indent=2))
+
+
+def _git_commit(repo_dir: str | Path = ".") -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=repo_dir,
+            stderr=subprocess.DEVNULL
+        ).decode().strip()
+    except Exception:
+        return "unknown"
+
+
+def write_run_manifest(run_dir: str | Path, config_path: str | Path,
+                       source_manifest: dict, artifact_paths: dict,
+                       extra: dict | None = None,
+                       input_paths: dict | None = None,
+                       model_metadata: dict | None = None) -> None:
+    """Write run_manifest.json recording config/data/model hashes and versions."""
+    run_dir = Path(run_dir)
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    artifacts = {}
+    for name, path in artifact_paths.items():
+        path = Path(path)
+        if not path.is_file():
+            raise FileNotFoundError(f"Required output artifact missing: {name}: {path}")
+        artifacts[name] = {"path": str(path), "sha256": sha256(path),
+                           "size_bytes": path.stat().st_size}
+
+    manifest = {
+        "git_commit":       _git_commit(),
+        "timestamp":        datetime.now(timezone.utc).isoformat(),
+        "python_version":   sys.version,
+        "platform":         platform.platform(),
+        "config_file":      str(config_path),
+        "config_sha256":    sha256(config_path),
+        "source_manifest":  source_manifest,
+        "artifacts":        artifacts,
+        "inputs":           _hash_required_files(input_paths or {}),
+        "model_metadata":   model_metadata or {},
+        "schema_version": 1,
+        "config_size_bytes": Path(config_path).stat().st_size,
+    }
+    if extra:
+        conflicts = set(extra) & set(manifest)
+        if conflicts:
+            raise ValueError(
+                f"Extra metadata overrides reserved fields: {sorted(conflicts)}"
+            )
+        manifest.update(extra)
+
+    manifest_path = run_dir / "run_manifest.json"
+
+    if manifest_path.exists():
+        existing = verify_run_manifest(run_dir)
+
+        comparable = (
+            "schema_version",
+            "config_sha256",
+            "config_size_bytes",
+            "source_manifest",
+            "artifacts",
+            "inputs",
+            "model_metadata",
+        )
+
+        if any(existing.get(key) != manifest.get(key) for key in comparable):
+            raise ValueError("Run manifest conflict")
+
+        if extra and any(existing.get(key) != value for key, value in extra.items()):
+            raise ValueError("Run manifest metadata conflict")
+
+        return
+
+    with manifest_path.open("x") as f:
+        f.write(json.dumps(manifest, indent=2) + "\n")
+        f.flush()
+        os.fsync(f.fileno())
+    print(f"Run manifest written: {run_dir / 'run_manifest.json'}")
+
+
+def _hash_required_files(paths: dict) -> dict:
+    """Hash required input files; fail closed on missing files."""
+    result = {}
+    for name, path in paths.items():
+        p = Path(path)
+        if not p.is_file():
+            raise FileNotFoundError(f"Required input artifact missing: {name}: {p}")
+        result[name] = {"path": str(p), "sha256": sha256(p),
+                        "size_bytes": p.stat().st_size}
+    return result
+
+def verify_run_manifest(run_dir: str | Path) -> dict:
+    """Verify the configuration, inputs, and outputs of a recorded run."""
+    path = Path(run_dir) / "run_manifest.json"
+    manifest = json.loads(path.read_text())
+
+    if manifest.get("schema_version") != 1:
+        raise ValueError("Unsupported run manifest schema")
+
+    def verify_file(record: dict, name: str) -> None:
+        file_path = Path(record["path"])
+        if not file_path.is_file():
+            raise FileNotFoundError(f"Missing manifest file: {name}")
+        if sha256(file_path) != record["sha256"]:
+            raise ValueError(f"Checksum mismatch: {name}")
+        if file_path.stat().st_size != record["size_bytes"]:
+            raise ValueError(f"Size mismatch: {name}")
+
+    verify_file(
+        {
+            "path": manifest["config_file"],
+            "sha256": manifest["config_sha256"],
+            "size_bytes": manifest["config_size_bytes"],
+        },
+        "configuration",
+    )
+
+    for category in ("inputs", "artifacts"):
+        for name, record in manifest[category].items():
+            verify_file(record, f"{category}/{name}")
+
+    return manifest

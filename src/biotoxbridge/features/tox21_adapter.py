@@ -1,0 +1,263 @@
+"""Tox21Project model adapter.
+
+Scores chemical structures against the 12 continuous Tox21 models by sending
+Morgan fingerprints to the nnsd_client HTTP server.
+
+API contract:
+  POST {base_url}/api/models/{model_name}/predict
+  Body: {"features": [<2048 floats>], "categorical": false}
+  Response: {"value": <float>}   (raw continuous score, already de-scaled)
+
+Usage:
+    from biotoxbridge.features.tox21_adapter import Tox21Adapter
+
+    adapter = Tox21Adapter("http://localhost:8080")
+    scores  = adapter.score_records(enriched_records)   # list[dict]
+"""
+
+import os
+import sys
+import time
+import math
+from typing import Any
+
+# Canonical endpoint order — must match the frozen model set exactly.
+TOX21_ENDPOINTS = [
+    "NR-AR", "NR-AR-LBD", "NR-AhR", "NR-Aromatase",
+    "NR-ER", "NR-ER-LBD", "NR-PPAR-gamma",
+    "SR-ARE", "SR-ATAD5", "SR-HSE", "SR-MMP", "SR-p53",
+]
+
+# Column names in the master/scored record dicts
+TOX21_SCORE_FIELDS = [f"tox21_{ep}" for ep in TOX21_ENDPOINTS]
+
+# Map canonical endpoint name → nnsd_client model name (snake_case)
+_ENDPOINT_TO_MODEL = {
+    "NR-AR":         "nr_ar",
+    "NR-AR-LBD":     "nr_ar_lbd",
+    "NR-AhR":        "nr_ahr",
+    "NR-Aromatase":  "nr_aromatase",
+    "NR-ER":         "nr_er",
+    "NR-ER-LBD":     "nr_er_lbd",
+    "NR-PPAR-gamma": "nr_ppar_gamma",
+    "SR-ARE":        "sr_are",
+    "SR-ATAD5":      "sr_atad5",
+    "SR-HSE":        "sr_hse",
+    "SR-MMP":        "sr_mmp",
+    "SR-p53":        "sr_p53",
+}
+
+_RETRIES = 3
+_TIMEOUT = 30
+
+
+class Tox21Adapter:
+    def __init__(
+        self,
+        base_url: str = "http://localhost:8080",
+        endpoints: list[str] | None = None,
+        radius: int = 2,
+        n_bits: int = 2048,
+        retries: int = _RETRIES,
+        timeout: int = _TIMEOUT,
+        api_key: str | None = None,
+    ):
+        self.base_url  = base_url.rstrip("/")
+        self.endpoints = endpoints or TOX21_ENDPOINTS
+        self.radius    = radius
+        self.n_bits    = n_bits
+        self.retries   = retries
+        self.timeout   = timeout
+        self.api_key   = api_key or os.environ.get("NNSD_KEY", "admin-secret-key-change-me")
+
+    # ── low-level ─────────────────────────────────────────────────────────────
+
+    def _predict_one(self, session: Any, model_name: str,
+                     features: list[float]) -> float:
+        import requests
+        url     = f"{self.base_url}/api/models/{model_name}/predict"
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+        payload = {"rows": [features]}
+        for attempt in range(self.retries + 1):
+            try:
+                r = session.post(url, json=payload, headers=headers,
+                                 timeout=self.timeout)
+                if not r.ok:
+                    raise RuntimeError(f"HTTP {r.status_code}: {r.text[:200]}")
+                data = r.json()
+                preds = data.get("predictions", [])
+                if preds:
+                    value = float(preds[0].get("value", float("nan")))
+
+                    if not math.isfinite(value):
+                        raise ValueError(
+                            f"Non-finite prediction from {model_name}: {value}"
+                        )
+
+                    return value
+                raise RuntimeError(f"Unexpected response: {data}")
+            except Exception as e:
+                if attempt == self.retries:
+                    raise
+                wait = min(2 ** attempt, 10)
+                print(f"  retry ({attempt+1}/{self.retries}) {model_name}: {e} ({wait}s)",
+                      file=sys.stderr)
+                time.sleep(wait)
+        return float("nan")   # unreachable
+
+    # ── public API ────────────────────────────────────────────────────────────
+
+    def score_smiles(self, smiles: str) -> dict[str, float]:
+        """Score a single SMILES string. Returns {endpoint: value, ...}."""
+        import requests
+        from biotoxbridge.features.fingerprints import morgan_fp
+        features = morgan_fp(smiles, radius=self.radius, n_bits=self.n_bits).tolist()
+        session  = requests.Session()
+        session.headers.update({"Authorization": f"Bearer {self.api_key}"})
+        return {ep: self._predict_one(session, _ENDPOINT_TO_MODEL.get(ep, ep), features)
+                for ep in self.endpoints}
+
+    def score_records(
+        self,
+        records: list[dict],
+        smiles_field: str = "canonical_smiles",
+        progress: bool = True,
+    ) -> list[dict]:
+        """
+        Score each record against all 12 endpoints.
+
+        Returns a list of dicts with original record fields plus one column per
+        endpoint named ``tox21_<endpoint>`` (e.g. ``tox21_NR-AR``).
+
+        Records where fingerprint generation fails are skipped and logged.
+        """
+        import requests
+        from biotoxbridge.features.fingerprints import morgan_fp
+
+        session  = requests.Session()
+        results  = []
+        n        = len(records)
+
+        for i, rec in enumerate(records, 1):
+            dtx    = rec.get("dtxsid", f"row{i}")
+            smiles = str(rec.get(smiles_field) or "").strip()
+            if not smiles:
+                print(f"  SKIP {dtx}: empty {smiles_field}", file=sys.stderr)
+                continue
+            try:
+                features = morgan_fp(
+                    smiles, radius=self.radius, n_bits=self.n_bits
+                ).tolist()
+            except Exception as e:
+                print(f"  SKIP {dtx}: fingerprint failed: {e}", file=sys.stderr)
+                continue
+
+            scores: dict[str, float] = {}
+            for ep in self.endpoints:
+                model_name = _ENDPOINT_TO_MODEL.get(ep, ep)
+                scores[f"tox21_{ep}"] = self._predict_one(session, model_name, features)
+
+            results.append({**rec, **scores})
+            if progress and i % 10 == 0:
+                print(f"  scored {i}/{n}", file=sys.stderr)
+
+        if progress:
+            print(f"Tox21 scoring complete: {len(results)}/{n} records scored.",
+                  file=sys.stderr)
+        return results
+
+    # ── regression-test ───────────────────────────────────────────────────────
+
+    def regression_test(
+        self,
+        scored: list[dict],
+        reference_csv: str,
+        tol: float = 0.01,
+    ) -> dict:
+        """Compare continuous Tox21 scores by canonical SMILES.
+
+        The legacy CSV uses SMILES, Valid, and <endpoint>_score columns.
+        A partial match is reported separately from the score comparison.
+        """
+        import csv
+        import math
+        from biotoxbridge.chemistry.structure_groups import _canonicalize
+
+        if not math.isfinite(tol) or tol < 0:
+            raise ValueError("tol must be finite and nonnegative")
+
+        required = {"SMILES", "Valid"} | {f"{ep}_score" for ep in self.endpoints}
+        reference = {}
+        invalid_reference = 0
+        with open(reference_csv, newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            missing = required - set(reader.fieldnames or [])
+            if missing:
+                raise ValueError(f"Reference CSV missing columns: {sorted(missing)}")
+            for row in reader:
+                if str(row["Valid"]).strip() not in {"1", "true", "True"}:
+                    invalid_reference += 1
+                    continue
+                smiles = str(row["SMILES"] or "").strip()
+                canon = _canonicalize(smiles) if smiles else None
+                if canon is None:
+                    invalid_reference += 1
+                    continue
+                if canon in reference:
+                    raise ValueError(f"Duplicate reference structure: {canon}")
+                reference[canon] = row
+
+        comparisons = {ep: [] for ep in self.endpoints}
+        matched = 0
+        unmatched = 0
+        seen = set()
+        for rec in scored:
+            smiles = str(rec.get("canonical_smiles") or "").strip()
+            canon = _canonicalize(smiles) if smiles else None
+            if canon is None:
+                unmatched += 1
+                continue
+            if canon in seen:
+                raise ValueError(f"Duplicate scored structure: {canon}")
+            seen.add(canon)
+            ref = reference.get(canon)
+            if ref is None:
+                unmatched += 1
+                continue
+            matched += 1
+            for ep in self.endpoints:
+                try:
+                    actual = float(rec[f"tox21_{ep}"])
+                    expected = float(ref[f"{ep}_score"])
+                except (KeyError, ValueError, TypeError) as exc:
+                    raise ValueError(f"Invalid score for {ep}, structure {canon}") from exc
+                if not math.isfinite(actual) or not math.isfinite(expected):
+                    raise ValueError(f"Non-finite score for {ep}, structure {canon}")
+                comparisons[ep].append(abs(actual - expected))
+
+        endpoints = {}
+        for ep, diffs in comparisons.items():
+            max_diff = max(diffs) if diffs else None
+            endpoints[ep] = {
+                "n_compared": len(diffs),
+                "max_abs_diff": max_diff,
+                "pass": max_diff is not None and max_diff <= tol,
+            }
+        if matched == 0:
+            status = "NOT_COMPARABLE"
+        elif all(v["pass"] for v in endpoints.values()):
+            status = "PASS"
+        else:
+            status = "FAIL"
+        return {
+            "status": status,
+            "all_pass": status == "PASS",
+            "tol": tol,
+            "n_scored": len(scored),
+            "n_reference_valid": len(reference),
+            "n_reference_invalid": invalid_reference,
+            "n_matched": matched,
+            "n_unmatched": unmatched,
+            "coverage": matched / len(scored) if scored else 0.0,
+            "endpoints": endpoints,
+        }

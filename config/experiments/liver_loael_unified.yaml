@@ -1,0 +1,8 @@
+schema_version: 1
+experiment_id: liver_loael_v1
+kind: loael_regression
+scientific_question: Does adding predicted Tox21 bioactivity improve liver LOAEL regression?
+master_path: runs/equivalence-direct-004/processed/liver_master.csv
+split_path: runs/equivalence-direct-004/splits/split_manifest.json
+output_dir: runs/liver_loael_v1/unified_reproduction
+holdout_policy: existing_frozen_split_reuse

@@ -1,0 +1,9 @@
+schema_version: 1
+experiment_id: toxcast_aeid252_v1
+kind: aeid252_binary
+scientific_question: Does adding predicted Tox21 bioactivity improve AEID252 classification?
+development_root: data/processed/toxcast_aeid252_v1
+fold_root: data/processed/toxcast_aeid252_v1/cv_folds
+output_dir: data/processed/toxcast_aeid252_v1/torch_nonlinear_v1
+device: auto
+holdout_policy: development_cv_only
