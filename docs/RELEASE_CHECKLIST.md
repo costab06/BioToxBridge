@@ -1,28 +1,26 @@
-# BioToxBridge public release checklist
+# BioToxBridge v0.1.0 release checklist
 
-The current local reproduction has succeeded; do not interpret this checklist as evidence that the remote repository is already clean.
+## Completed validation
 
-## Required before publishing
+- [x] Public unified runner and both experiment configurations.
+- [x] Clean public checkout: 181 standalone tests passed.
+- [x] All 24 published metrics reproduced to four decimal places, including standalone logistic baselines.
+- [x] 18 LOAEL release audit checks passed.
+- [x] 50 frozen input integrity checks passed in the original data workspace.
+- [x] Frozen input archive and SHA-256 checksum prepared.
+- [x] Validated dependency inventory prepared.
+- [x] Live OAF v0.2.2 / Redis integration: 13 submission tests and one opt-in SIGKILL recovery test passed.
+- [x] Git history secret scan passed after documenting four individually reviewed false positives.
+- [x] README and reproduction documentation updated.
+- [x] Historical nnsd adapters documented as outside the supported frozen-data reproduction path.
+- [x] AEID252 described as development CV, not independent holdout validation.
 
-- [ ] Run `python scripts/audit_loael_release.py` and retain its output.
-- [x] Unified runner, LOAEL implementation, AEID252 implementation and both experiment YAML files are present in the public source tree.
-- [ ] Confirm that the frozen LOAEL master and split manifest, and the AEID252 fold files, are either distributed with permission or available at documented permanent locations with SHA-256 checksums.
-- [ ] Check licenses and redistribution permissions for Tox21, ToxCast, ToxRefDB and any derived data.
-- [ ] Review `git status`, `.gitignore`, and staged files; exclude local `.venv`, logs, server outputs, API keys, large intermediate data, and private artifacts.
-- [ ] Isolate the historical nnsd-dependent `tox21_adapter.py` and related pipeline paths as legacy components, or remove them only after confirming no supported imports depend on them. Do not delete them blindly: existing projectors import `TOX21_SCORE_FIELDS` from that module.
-- [x] Root README describes BioToxBridge and both experiments.
-- [ ] Run both unified runner commands and tests from a clean environment before tagging.
-- [ ] Confirm no tracked secrets using a secret scanner and a review of `git diff --cached`.
-- [ ] Describe AEID252 as a development cross-validation result, not an independent holdout success.
+## Publication
 
-## Suggested staging commands
+- [ ] Final PR CI and merge.
+- [ ] Tag and publish v0.1.0.
+- [ ] Publish permitted release assets and update availability instructions.
 
-```bash
-git status --short
-git diff --check
-python scripts/audit_loael_release.py
-# Review before staging; do not use git add -A without checking artifacts.
-git diff --stat
-```
+Dataset redistribution permission review was deferred at the maintainer's direction; permissions have not been verified. The code license does not automatically cover third-party data. Frozen input assets remain unpublished pending a distribution decision. The standalone reproduction uses frozen predicted Tox21 features rather than regenerating original model weights. OAF integration validation covers the ESOL lifecycle, not OAF-native toxicity experiment execution.
 
-The deprecated RDKit Morgan fingerprint warnings are non-fatal. Modernizing the API can be handled after release, provided fingerprint equivalence is verified.
+Nonfatal RDKit and pytest-asyncio warnings remain; modernization is outside the initial release scope.
