@@ -21,6 +21,21 @@ The two tasks have different targets, model families, and evaluation procedures.
 
 The Tox21 values are **predicted features**, not observed assay measurements for each study chemical. Their provenance and potential dependencies must be considered when interpreting results.
 
+## Installation
+
+Requires Python 3.10 or newer. From a fresh checkout:
+
+```bash
+git clone https://github.com/costab06/BioToxBridge.git
+cd BioToxBridge
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[test,torch]'
+python -m pytest -m 'not integration'
+```
+
+Read the [published article](https://medium.com/@costab06/biotoxbridge-building-a-scientific-experimentation-framework-on-openagentfabric-7247bb6289ea) for the scientific motivation and results.
+
 ## Run the experiments
 
 From the repository root, in an environment with the project's dependencies installed:
@@ -38,7 +53,7 @@ AEID252 uses the unified runner with `config/experiments/aeid252_unified.yaml` a
 
 ## Reproducibility and data availability
 
-The repository's frozen artifacts are inputs to the reproduction. If they are not included in a public release, provide a permitted distribution location, checksums, and regeneration instructions; do not claim that cloning the repository alone reproduces the results. Review source dataset licenses and redistribution rights before publishing. Do not commit private credentials, local machine paths, or trained model artifacts without checking permissions.
+The frozen experimental inputs are not currently distributed in this repository. A clone alone cannot reproduce the published metrics. See [reproducibility requirements](docs/REPRODUCIBILITY.md) for the required paths and outstanding data distribution work.
 
 The LOAEL reproduction produces `metrics.json`, `predictions.csv`, `provenance.json`, and `experiment_execution.json`. The provenance includes SHA-256 hashes of the frozen master and split manifest. The audit script checks those hashes, record counts, split integrity, and the reported regression metrics.
 
@@ -52,7 +67,7 @@ The current unified command-line runner provides a common experiment configurati
 
 ## Historical components
 
-Earlier development used a separate neural-network inference service for Tox21 feature generation. The frozen LOAEL reproduction does not use that service. Historical adapters may remain in the source tree for provenance, but they are not part of the supported release execution path; audit or isolate them before publishing.
+Earlier development used a separate neural-network inference service for Tox21 feature generation. The frozen LOAEL reproduction does not use that service. Historical adapters remain in the source tree for provenance and are not part of the supported frozen-data reproduction path.
 
 ## Research limitations
 
