@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest"]
+test = ["pytest", "redis"]
 torch = ["torch"]
 
 [tool.setuptools.packages.find]
