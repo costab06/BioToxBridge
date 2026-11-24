@@ -21,6 +21,9 @@ import pytest
 from redis.asyncio import Redis
 from redis.exceptions import ResponseError
 
+pytestmark = pytest.mark.integration
+pytest.importorskip("shared", reason="Requires optional OpenAgentFabric framework on PYTHONPATH")
+
 from shared.correlation.registry import CorrelationRecord
 from shared.eventbus.events import EventEnvelope
 
