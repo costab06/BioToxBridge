@@ -23,3 +23,34 @@ python -m biotoxbridge.experiments.runner config/experiments/aeid252_unified.yam
 ```
 
 Dry runs describe commands; they do not validate input availability. After obtaining the exact frozen inputs, repeat without `--dry-run` and run `python scripts/audit_loael_release.py`. Preserve execution manifests and metrics. AEID252 reports development cross-validation, not independent holdout validation. OAF is optional for these commands.
+
+## Validated reproduction record
+
+A fresh public checkout at commit `400e565`, followed by the standalone logistic runner at `b4b4cac`, reproduced all 24 published metrics to four decimal places. The standalone suite reported 181 passed, 1 skipped and 1 deselected. The LOAEL audit passed all 18 checks. Fifty frozen input integrity checks passed in the original data workspace.
+
+The validated environment used Python 3.12.13, an NVIDIA GeForce RTX 4060, driver 580.82.07 and PyTorch 2.15.0+cu132. Clear inherited PYTHONPATH before installing and running standalone experiments. The planned release assets include the validated dependency inventory and frozen input archive; availability remains pending publication.
+
+Run the additional logistic baseline from the repository root:
+
+```bash
+python experiments/toxcast_aeid252/logistic/run_logistic.py
+```
+
+| Representation | Logistic mean fold AP | Logistic pooled AUC | Small NN mean fold AP | Small NN pooled AUC |
+|---|---:|---:|---:|---:|
+| A | 0.5766 | 0.6365 | 0.5876 | 0.6605 |
+| B | 0.6428 | 0.7217 | 0.6327 | 0.6957 |
+| D | 0.6163 | 0.6791 | 0.6638 | 0.7303 |
+
+Logistic C selection and reporting reuse the same five development folds; these are model-selection estimates, not unbiased nested-CV estimates. Frozen predicted Tox21 features are reused, not regenerated from original model weights.
+
+## Optional OAF integration validation
+
+In a separate environment with OpenAgentFabric v0.2.2 (commit `ec73d1a`), Redis 7 on localhost port 6381, and OAF dependencies installed, all 13 submission tests and the opt-in ESOL crash-recovery test passed. The latter completed in 64.40 seconds and verified SIGKILL recovery, immutable acquisition artifacts, durable OAF records, lifecycle completion and zero pending messages.
+
+```bash
+python -m pytest -v tests/test_esol_submission.py
+BIOTOXBRIDGE_RUN_CRASH_TEST=1 python -m pytest -v -s tests/test_esol_crash_recovery_integration.py
+```
+
+These tests require OAF framework on PYTHONPATH and access to the ESOL dataset. They validate the ESOL execution lifecycle, not OAF-native execution of the toxicity experiments. Use an isolated test Redis instance where possible. No OAF source changes were required.

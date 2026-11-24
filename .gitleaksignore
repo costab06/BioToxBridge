@@ -1,0 +1,5 @@
+# Reviewed false positives: chemical dataset exclusion records.
+6b8588b300676af1c825d160b48f1275bc124452:src/biotoxbridge/datasets/toxcast_master.py:generic-api-key:34
+6b8588b300676af1c825d160b48f1275bc124452:src/biotoxbridge/datasets/toxcast_master.py:generic-api-key:38
+6b8588b300676af1c825d160b48f1275bc124452:src/biotoxbridge/datasets/toxcast_master.py:generic-api-key:42
+6b8588b300676af1c825d160b48f1275bc124452:src/biotoxbridge/datasets/toxcast_master.py:generic-api-key:54
